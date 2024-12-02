@@ -29,10 +29,7 @@ defmodule AdventOfCode.Day02 do
     # is initial sequence safe?
     # or check all sequences with one element removed
     safe(l) or
-      for i <- 0..(length(l) - 1) do
-        l |> List.delete_at(i) |> safe()
-      end
-      |> any?()
+      any?(for i <- 0..(length(l) - 1), do: safe(List.delete_at(l, i)))
   end
 
   def part2(args) do
