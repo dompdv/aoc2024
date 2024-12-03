@@ -3,21 +3,15 @@ defmodule AdventOfCode.Day03 do
 
   def part1(args) do
     Regex.scan(~r/mul\((\d+),(\d+)\)/, args)
-    |> map(fn [_a, b, c] -> String.to_integer(b) * String.to_integer(c) end)
-    |> sum()
+    |> reduce(0, fn [_a, b, c], acc -> acc + String.to_integer(b) * String.to_integer(c) end)
   end
 
   def part2(args) do
     Regex.scan(~r/mul\((\d+),(\d+)\)|do\(\)|don't\(\)/, args)
-    |> map(fn
-      [_, b, c] -> String.to_integer(b) * String.to_integer(c)
-      ["do()"] -> :start
-      _ -> :stop
-    end)
     |> reduce({:running, 0}, fn
-      :start, {_, acc} -> {:running, acc}
-      :stop, {_, acc} -> {:stopped, acc}
-      a, {:running, acc} -> {:running, acc + a}
+      ["do()"], {_, acc} -> {:running, acc}
+      [_, b, c], {:running, acc} -> {:running, acc + String.to_integer(b) * String.to_integer(c)}
+      ["don" <> _], {_, acc} -> {:stopped, acc}
       _, acc -> acc
     end)
     |> elem(1)
