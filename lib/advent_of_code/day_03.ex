@@ -11,7 +11,7 @@ defmodule AdventOfCode.Day03 do
     |> reduce({:running, 0}, fn
       ["do()"], {_, acc} -> {:running, acc}
       [_, b, c], {:running, acc} -> {:running, acc + String.to_integer(b) * String.to_integer(c)}
-      ["don" <> _], {_, acc} -> {:stopped, acc}
+      [_], {_, acc} -> {:stopped, acc}
       _, acc -> acc
     end)
     |> elem(1)
