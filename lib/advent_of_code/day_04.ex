@@ -28,11 +28,10 @@ defmodule AdventOfCode.Day04 do
   end
 
   def count_words(puzzle, {r, c}) do
-    for sequence <- @sequences do
+    reduce(@sequences, 0, fn sequence, acc ->
       word = for {dr, dc} <- sequence, do: Map.get(puzzle, {r + dr, c + dc}, 0)
-      if word == @word, do: 1, else: 0
-    end
-    |> sum()
+      if word == @word, do: acc + 1, else: acc
+    end)
   end
 
   def part1(args) do
@@ -42,13 +41,13 @@ defmodule AdventOfCode.Day04 do
   end
 
   def count_x(puzzle, {r, c}) do
-    matched =
-      for sequence <- @seq2 do
-        all?(for {dr, dc, letter} <- sequence, do: Map.get(puzzle, {r + dr, c + dc}, 0) == letter)
-      end
-      |> count(& &1)
-
-    if matched == 2, do: 1, else: 0
+    reduce(@seq2, 0, fn sequence, acc ->
+      m = all?(for {dr, dc, letter} <- sequence, do: Map.get(puzzle, {r + dr, c + dc}) == letter)
+      if m, do: acc + 1, else: acc
+    end)
+    |> then(fn matched ->
+      if matched == 2, do: 1, else: 0
+    end)
   end
 
   def part2(args) do
