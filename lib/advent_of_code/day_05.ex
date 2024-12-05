@@ -1,22 +1,23 @@
 defmodule AdventOfCode.Day05 do
   import Enum
 
+  def add(m, key, val) do
+    case Map.fetch(m, key) do
+      {:ok, l} -> Map.put(m, key, [val | l])
+      :error -> Map.put(m, key, [val])
+    end
+  end
+
   def parse1(p) do
-    p
-    |> String.split("\n", trim: true)
+    String.split(p, "\n", trim: true)
     |> reduce(%{}, fn l, acc ->
       [p1, p2] = l |> String.split("|", trim: true) |> map(&String.to_integer/1)
-
-      case Map.fetch(acc, p1) do
-        {:ok, l} -> Map.put(acc, p1, [p2 | l])
-        :error -> Map.put(acc, p1, [p2])
-      end
+      add(acc, p1, p2)
     end)
   end
 
   def parse2(p) do
-    p
-    |> String.split("\n", trim: true)
+    String.split(p, "\n", trim: true)
     |> map(fn l -> l |> String.split(",", trim: true) |> map(&String.to_integer/1) end)
   end
 
@@ -25,7 +26,7 @@ defmodule AdventOfCode.Day05 do
     {parse1(part1), parse2(part2)}
   end
 
-  def is_before1(p1, p2, rules) do
+  def is_before(p1, p2, rules) do
     rules_p1 = Map.get(rules, p1)
     rules_p2 = Map.get(rules, p2)
 
@@ -36,57 +37,30 @@ defmodule AdventOfCode.Day05 do
     end
   end
 
-  def control(update, rules) do
+  def monotonic(update, rules) do
     ordered = with_index(update)
 
-    for({page1, i} <- ordered, {page2, j} <- ordered, j > i, do: is_before1(page1, page2, rules))
+    for({page1, i} <- ordered, {page2, j} <- ordered, j > i, do: is_before(page1, page2, rules))
     |> all?()
   end
+
+  def middle(l), do: Enum.at(l, div(length(l), 2))
 
   def part1(args) do
     {rules, updates} = args |> parse()
 
-    updates
-    |> map(fn update ->
-      if control(update, rules), do: Enum.at(update, div(length(update), 2)), else: 0
+    reduce(updates, 0, fn update, acc ->
+      if monotonic(update, rules), do: acc + middle(update), else: acc
     end)
-    |> sum()
   end
 
   def part2(args) do
-    args
-  end
+    {rules, updates} = args |> parse()
 
-  def test(_) do
-    """
-    47|53
-    97|13
-    97|61
-    97|47
-    75|29
-    61|13
-    75|53
-    29|13
-    97|29
-    53|29
-    61|53
-    97|53
-    61|29
-    47|13
-    75|47
-    97|75
-    47|61
-    75|61
-    47|29
-    75|13
-    53|13
-
-    75,47,61,53,29
-    97,61,53,29,13
-    75,29,13
-    75,97,47,61,53
-    61,13,29
-    97,13,75,29,47
-    """
+    reduce(updates, 0, fn update, acc ->
+      if monotonic(update, rules),
+        do: acc,
+        else: acc + (sort(update, &is_before(&1, &2, rules)) |> middle())
+    end)
   end
 end
