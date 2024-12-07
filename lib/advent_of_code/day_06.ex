@@ -1,6 +1,7 @@
 defmodule AdventOfCode.Day06 do
   import Enum
 
+  @dir_symbols %{?^ => :n, ?> => :e, ?v => :s, ?< => :w}
   def parse(args) do
     String.split(args, "\n", trim: true)
     |> with_index()
@@ -11,10 +12,7 @@ defmodule AdventOfCode.Day06 do
     |> reduce({%{}, nil}, fn
       {p, ?.}, {board, guard} -> {Map.put(board, p, :empty), guard}
       {p, ?#}, {board, guard} -> {Map.put(board, p, :block), guard}
-      {p, ?^}, {board, _} -> {Map.put(board, p, :empty), {p, :n}}
-      {p, ?>}, {board, _} -> {Map.put(board, p, :empty), {p, :e}}
-      {p, ?v}, {board, _} -> {Map.put(board, p, :empty), {p, :s}}
-      {p, ?<}, {board, _} -> {Map.put(board, p, :empty), {p, :w}}
+      {p, dir}, {board, _} -> {Map.put(board, p, :empty), {p, @dir_symbols[dir]}}
     end)
   end
 
@@ -35,17 +33,23 @@ defmodule AdventOfCode.Day06 do
 
   def get_pos({_, pos}), do: pos
 
+  def launch(state), do: run(state, MapSet.new([get_pos(state)]))
+
   def run(state, seen) do
     case move(state) do
       :out ->
         seen
 
       new_state ->
-        if get_pos(new_state) in seen,
+        new_pos = get_pos(new_state)
+
+        if new_pos in seen,
           do: :loop,
-          else: run(new_state, MapSet.put(seen, get_pos(new_state)))
+          else: run(new_state, MapSet.put(seen, new_pos))
     end
   end
+
+  def loop?(state), do: launch(state) == :loop
 
   def count_cells(seen) do
     for({p, _} <- seen, do: p) |> uniq() |> length()
@@ -53,16 +57,15 @@ defmodule AdventOfCode.Day06 do
 
   def part1(args) do
     state = args |> parse()
-    run(state, MapSet.new([get_pos(state)])) |> count_cells()
+    launch(state) |> count_cells()
   end
 
   def part2(args) do
     {board, guard} = args |> parse()
-    cells = Map.keys(board)
     {starting, _} = guard
 
-    for cell <- cells, cell != starting do
-      if run({Map.put(board, cell, :block), guard}, MapSet.new([guard])) == :loop, do: 1, else: 0
+    for cell <- Map.keys(board), cell != starting, board[cell] == :empty do
+      if loop?({Map.put(board, cell, :block), guard}), do: 1, else: 0
     end
     |> sum()
   end

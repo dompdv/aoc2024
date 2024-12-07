@@ -5,8 +5,7 @@ defmodule AdventOfCode.Day01 do
     args
     |> String.split("\n", trim: true)
     |> map(fn s ->
-      [a, b] = String.split(s, " ", trim: true)
-      {String.to_integer(a), String.to_integer(b)}
+      s |> String.split(" ", trim: true) |> map(&String.to_integer/1) |> List.to_tuple()
     end)
     |> unzip()
   end

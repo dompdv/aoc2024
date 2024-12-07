@@ -22,7 +22,7 @@ defmodule AdventOfCode.Day02 do
   def safed(_), do: false
 
   def part1(args) do
-    args |> parse() |> map(&safe/1) |> filter(& &1) |> count()
+    args |> parse() |> filter(&safe/1) |> count()
   end
 
   def safe2(l) do
@@ -33,6 +33,6 @@ defmodule AdventOfCode.Day02 do
   end
 
   def part2(args) do
-    args |> parse() |> map(&safe2/1) |> filter(& &1) |> count()
+    args |> parse() |> filter(&safe2/1) |> count()
   end
 end
