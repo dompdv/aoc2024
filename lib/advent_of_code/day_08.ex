@@ -8,21 +8,25 @@ defmodule AdventOfCode.Day08 do
     end
   end
 
+  def grid_to_map(args) do
+    args
+    |> String.split("\n", trim: true)
+    |> with_index()
+    |> map(fn {line, r} ->
+      line |> to_charlist() |> with_index() |> map(fn {ch, c} -> {{r, c}, ch} end)
+    end)
+    |> List.flatten()
+  end
+
   def parse(args) do
-    splitted = args |> String.split("\n", trim: true)
+    size = args |> String.split("\n", trim: true) |> length()
 
     board =
-      splitted
-      |> with_index()
-      |> map(fn {line, r} ->
-        line |> to_charlist() |> with_index() |> map(fn {ch, c} -> {{r, c}, ch} end)
-      end)
-      |> List.flatten()
-      |> reduce(%{}, fn {{r, c}, ch}, acc ->
+      reduce(grid_to_map(args), %{}, fn {{r, c}, ch}, acc ->
         if ch == ?. or ch == ?#, do: acc, else: add(acc, ch, {r, c})
       end)
 
-    {board, length(splitted)}
+    {board, size}
   end
 
   def in_grid({r, c}, grid_size) do
