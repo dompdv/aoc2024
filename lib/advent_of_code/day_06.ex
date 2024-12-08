@@ -64,9 +64,11 @@ defmodule AdventOfCode.Day06 do
     {board, guard} = args |> parse()
     {starting, _} = guard
 
-    for cell <- Map.keys(board), cell != starting, board[cell] == :empty do
-      if loop?({Map.put(board, cell, :block), guard}), do: 1, else: 0
-    end
-    |> sum()
+    board
+    |> Map.keys()
+    |> filter(fn cell -> cell != starting and board[cell] == :empty end)
+    |> Task.async_stream(fn cell -> loop?({Map.put(board, cell, :block), guard}) end)
+    |> Stream.filter(fn {:ok, v} -> v != false end)
+    |> count()
   end
 end

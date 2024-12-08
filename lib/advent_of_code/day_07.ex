@@ -42,7 +42,12 @@ defmodule AdventOfCode.Day07 do
   end
 
   def check(args, n_ops) do
-    args |> parse() |> map(fn line -> works?(line, n_ops) end) |> filter(&(&1 != false)) |> sum()
+    args
+    |> parse()
+    |> Task.async_stream(fn line -> works?(line, n_ops) end)
+    |> Stream.map(&elem(&1, 1))
+    |> filter(&(&1 != false))
+    |> sum()
   end
 
   def part1(args), do: check(args, 2)
