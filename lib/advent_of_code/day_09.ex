@@ -1,47 +1,58 @@
 defmodule AdventOfCode.Day09 do
   import Enum
 
-  def parse(args) do
-    args |> to_charlist() |> map(&(&1 - ?0))
-  end
+  def parse(args), do: args |> to_charlist() |> map(&(&1 - ?0))
 
   #### PART 1 ####
+
+  # Build a disk: {free_map, file_map, disk}
+  # free_map: a list of free block ids, ordered by block id
+  # file_map: a list of {block_id, file_id}, ordered by block id desc
+  # disk: a map with block_id as key and file_id as value or :free if the block is free
+
+  # Start of recursion
   def build_disk(blocks), do: build_disk(blocks, :file, {0, 0, [], []})
 
+  # End of recursion
   def build_disk([], _, {m, _, free_map, file_map}) do
+    # build the disk map
     disk = for(i <- 0..(m - 1), into: %{}, do: {i, :free}) |> Map.merge(Map.new(file_map))
+    # order free_map
     {reverse(free_map), file_map, disk}
   end
 
   def build_disk([n | r], :file, {block_id, file_id, free_map, file_map}) do
+    # adjust the file_map
     new_file_map =
       reduce(block_id..(block_id + n - 1), file_map, fn i, acc -> [{i, file_id} | acc] end)
 
     build_disk(r, :free, {block_id + n, file_id + 1, free_map, new_file_map})
   end
 
-  def build_disk([0 | r], :free, {block_id, file_id, free_map, file_map}) do
-    build_disk(r, :file, {block_id, file_id, free_map, file_map})
-  end
+  # skip free zones of size 0
+  def build_disk([0 | r], :free, acc), do: build_disk(r, :file, acc)
 
   def build_disk([n | r], :free, {block_id, file_id, free_map, file_map}) do
+    # adjust the free_map
     new_free_map = reduce(block_id..(block_id + n - 1), free_map, fn i, acc -> [i | acc] end)
     build_disk(r, :file, {block_id + n, file_id, new_free_map, file_map})
   end
 
-  def max_keys(a_map) do
-    reduce(a_map, 0, fn {k, _}, acc -> Kernel.max(k, acc) end)
-  end
+  ## Rearrange
 
+  # End of recursion
   def rearrange({[], _file_map, disk}), do: disk
   def rearrange({_, [], disk}), do: disk
 
+  # Consider the first free block and the last file block
   def rearrange({[f | r_free], [fi | r_fi], disk}) do
     {last_file_block, file_id} = fi
 
+    # it the 2 cross, then the disk is already rearranged
     if f > last_file_block do
       disk
     else
+      # move the file block to the free block
       new_disk = Map.put(disk, f, file_id) |> Map.put(last_file_block, :free)
       rearrange({r_free, r_fi, new_disk})
     end
@@ -51,9 +62,7 @@ defmodule AdventOfCode.Day09 do
     for({block_id, file_id} <- disk, file_id != :free, do: block_id * file_id) |> sum()
   end
 
-  def part1(args) do
-    args |> parse() |> build_disk() |> rearrange() |> checksum()
-  end
+  def part1(args), do: args |> parse() |> build_disk() |> rearrange() |> checksum()
 
   #### PART 2 ####
 
@@ -151,7 +160,5 @@ defmodule AdventOfCode.Day09 do
     |> sum()
   end
 
-  def part2(args) do
-    args |> parse() |> build_disk2() |> rearrange2() |> checksum2()
-  end
+  def part2(args), do: args |> parse() |> build_disk2() |> rearrange2() |> checksum2()
 end
