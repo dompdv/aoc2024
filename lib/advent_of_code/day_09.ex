@@ -56,6 +56,10 @@ defmodule AdventOfCode.Day09 do
   end
 
   #### PART 2 ####
+
+  ## Build a disk: {free_zones, file_zones}.
+  # free_zones: an list of {start_block_id, size}, ordered by start_block_id
+  # file_zones: an list of {start_block_id, size, file_id}, ordered by start_block_id desc
   def build_disk2(blocks), do: build_disk2(blocks, :file, {0, 0, [], []})
 
   def build_disk2([], _, {_, _, free_zones, file_zones}), do: {reverse(free_zones), file_zones}
@@ -74,6 +78,7 @@ defmodule AdventOfCode.Day09 do
     build_disk2(r, :file, {block_id + n, file_id, new_free_zones, file_zones})
   end
 
+  ## Find a zone that fits the file, which is before "max_block_id"
   def find_zone(free_zones, n, max_block_id) do
     reduce_while(free_zones, {false, 0}, fn {free_block_id, size}, {_, index} ->
       cond do
@@ -84,51 +89,54 @@ defmodule AdventOfCode.Day09 do
     end)
   end
 
-  def merge_adjacent_zones(l), do: merge_adjacent_zones(l, [])
-  def merge_adjacent_zones([a], acc), do: [a | acc] |> reverse()
+  ## Sorts the list of zones and merges adjacent zones and remove zones with size 0
+  def clean_zones(l), do: l |> sort() |> merge_adjacent_zones([])
 
-  def merge_adjacent_zones([{s1, n1}, {s2, n2} | r], acc) do
-    if s1 + n1 == s2 do
-      merge_adjacent_zones([{s1, n1 + n2} | r], acc)
-    else
-      merge_adjacent_zones([{s2, n2} | r], [{s1, n1} | acc])
-    end
-  end
+  def merge_adjacent_zones([a], acc), do: reverse([a | acc])
 
+  # remove zones with size 0
+  def merge_adjacent_zones([{_, 0} | r], acc), do: merge_adjacent_zones(r, acc)
+
+  # merge 2 adjacent zones
+  def merge_adjacent_zones([{s1, n1}, {s2, n2} | r], acc) when s1 + n1 == s2,
+    do: merge_adjacent_zones([{s1, n1 + n2} | r], acc)
+
+  # zones are not adjacent
+  def merge_adjacent_zones([{s1, n1}, {s2, n2} | r], acc),
+    do: merge_adjacent_zones([{s2, n2} | r], [{s1, n1} | acc])
+
+  ## Rearrange
+  # Start of recursion
   def rearrange2({free_zones, file_zones_to_move}),
     do: rearrange2(free_zones, file_zones_to_move, [])
 
-  def rearrange2(free_zones, file_zones_to_move, processed_file_zones)
+  # End of recursion
+  def rearrange2(_free_zones, [], processed_file_zones), do: processed_file_zones
 
-  def rearrange2(_free_zones, [], processed_file_zones) do
-    processed_file_zones
-  end
-
+  # Consider a file_zone
   def rearrange2(free_zones, [file_zone | r_fz], processed) do
     {block_id, file_size, file_id} = file_zone
 
+    # find a free zone that fits the file
     case find_zone(free_zones, file_size, block_id) do
       {false, _} ->
+        # no free zone found, move to the next file_zone
         rearrange2(free_zones, r_fz, [file_zone | processed])
 
       {true, free_zone_index, free_zone_block_id, free_zone_size} ->
+        # free zone found, move the file to the free zone
         new_processed = [{free_zone_block_id, file_size, file_id} | processed]
 
+        # the file zone is now free and the free zone is now used. Then update the free_zones list
         new_free_zones =
-          if free_zone_size == file_size do
-            [{block_id, file_size} | List.delete_at(free_zones, free_zone_index)]
-          else
-            [
-              {block_id, file_size}
-              | List.replace_at(
-                  free_zones,
-                  free_zone_index,
-                  {free_zone_block_id + file_size, free_zone_size - file_size}
-                )
-            ]
-          end
-          |> sort()
-          |> merge_adjacent_zones()
+          clean_zones([
+            {block_id, file_size}
+            | List.replace_at(
+                free_zones,
+                free_zone_index,
+                {free_zone_block_id + file_size, free_zone_size - file_size}
+              )
+          ])
 
         rearrange2(new_free_zones, r_fz, new_processed)
     end
