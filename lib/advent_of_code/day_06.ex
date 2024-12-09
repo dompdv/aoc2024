@@ -67,6 +67,7 @@ defmodule AdventOfCode.Day06 do
     board
     |> Map.keys()
     |> filter(fn cell -> cell != starting and board[cell] == :empty end)
+    # Speep up by computing on each CPU cores in parallel
     |> Task.async_stream(fn cell -> loop?({Map.put(board, cell, :block), guard}) end)
     |> Stream.filter(fn {:ok, v} -> v != false end)
     |> count()
