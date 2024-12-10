@@ -11,63 +11,49 @@ defmodule AdventOfCode.Day10 do
     |> Map.new()
   end
 
+  # Utilities
   @dirs [{-1, 0}, {1, 0}, {0, -1}, {0, 1}]
 
   def move({r, c}, {dr, dc}), do: {r + dr, c + dc}
 
-  def count_trails(pos, grid, targets) do
-    current_height = grid[pos]
+  def can_go_there?(grid, pos, d), do: Map.get(grid, move(pos, d), -1) == grid[pos] + 1
 
+  ### Part 1
+  def identify_trails(pos, grid) do
+    identify_trails(pos, grid, MapSet.new()) |> MapSet.size()
+  end
+
+  def identify_trails(pos, grid, targets) do
     cond do
-      current_height == 9 and pos in targets ->
+      grid[pos] == 9 and pos in targets ->
         targets
 
-      current_height == 9 ->
+      grid[pos] == 9 ->
         MapSet.put(targets, pos)
 
       true ->
         reduce(@dirs, targets, fn d, l_targets ->
-          if Map.get(grid, move(pos, d), -1) == current_height + 1 do
-            count_trails(move(pos, d), grid, l_targets)
-          else
-            l_targets
-          end
+          if can_go_there?(grid, pos, d),
+            do: identify_trails(move(pos, d), grid, l_targets),
+            else: l_targets
         end)
     end
   end
 
   def part1(args) do
     grid = args |> parse()
+    sum(for({k, v} <- grid, v == 0, do: identify_trails(k, grid)))
+  end
 
-    for {k, v} <- grid, v == 0 do
-      count_trails(k, grid, MapSet.new()) |> MapSet.size()
-    end
-    |> sum()
+  ### Part 2
+  def count_trails(pos, grid) do
+    if grid[pos] == 9,
+      do: 1,
+      else: sum(for d <- @dirs, can_go_there?(grid, pos, d), do: count_trails(move(pos, d), grid))
   end
 
   def part2(args) do
-    args
-  end
-
-  def test(_) do
-    """
-    0123
-    1234
-    8765
-    9876
-    """
-  end
-
-  def test1(_) do
-    """
-    89010123
-    78121874
-    87430965
-    96549874
-    45678903
-    32019012
-    01329801
-    10456732
-    """
+    grid = args |> parse()
+    sum(for({k, v} <- grid, v == 0, do: count_trails(k, grid)))
   end
 end
