@@ -29,19 +29,44 @@ defmodule AdventOfCode.Day11 do
     end
   end
 
-  def blink(l), do: blink(l, [])
-  def blink([], acc), do: acc
+  def blink(l) do
+    reduce(l, %{}, fn {e, occurences}, acc ->
+      case mutate(e) do
+        {le, ri} ->
+          acc
+          |> Map.update(le, occurences, &(&1 + occurences))
+          |> Map.update(ri, occurences, &(&1 + occurences))
 
-  def blink([e | l], acc) do
+        v ->
+          Map.update(acc, v, occurences, &(&1 + occurences))
+      end
+    end)
+  end
+
+  def blink(%{}, acc), do: acc
+
+  def blink([{e, occurences} | l], acc) do
+    IO.inspect({e, occurences})
+
     case mutate(e) do
-      {le, ri} -> blink(l, [ri, le | acc])
-      v -> blink(l, [v | acc])
+      {le, ri} ->
+        new_acc =
+          acc
+          |> Map.update(le, occurences, &(&1 + occurences))
+          |> Map.update(ri, 1, &(&1 + occurences))
+
+        blink(l, new_acc)
+
+      v ->
+        new_acc = Map.update(acc, v, occurences, &(&1 + 1))
+        blink(l, new_acc)
     end
   end
 
   def part1(args) do
     initial = args |> parse()
-    reduce(1..25, initial, fn _, l -> blink(l) end) |> length()
+    initial_d = for e <- initial, into: %{}, do: {e, 1}
+    reduce(1..25, initial_d, fn _, l -> blink(l) end) |> reduce(0, fn {_, v}, acc -> acc + v end)
   end
 
   def compute_seed(e, n) do
@@ -50,19 +75,7 @@ defmodule AdventOfCode.Day11 do
 
   def part2(args) do
     initial = args |> parse()
-    e = hd(initial)
-    compute_seed(e, 75)
-
-    #    memo =
-    #      for e <- initial, into: %{} do
-    #        result = compute_seed(e, 25)
-    #        {e, {result, length(result)}}
-    #      end
+    initial_d = for e <- initial, into: %{}, do: {e, 1}
+    reduce(1..75, initial_d, fn _, l -> blink(l) end) |> reduce(0, fn {_, v}, acc -> acc + v end)
   end
-
-  def test(_) do
-    "0 1 10 99 999"
-  end
-
-  def test2(_), do: "125 17"
 end
