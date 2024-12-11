@@ -11,29 +11,21 @@ defmodule AdventOfCode.Day11 do
 
   def split_digits(e, n_digits) do
     cut_by = 10 ** div(n_digits, 2)
-    {div(e, cut_by), rem(e, cut_by)}
+    [div(e, cut_by), rem(e, cut_by)]
   end
 
   def mutate(e) do
     if e == 0 do
-      1
+      [1]
     else
       n_digits = floor(:math.log10(e)) + 1
-      if rem(n_digits, 2) == 0, do: split_digits(e, n_digits), else: e * 2024
+      if rem(n_digits, 2) == 0, do: split_digits(e, n_digits), else: [e * 2024]
     end
   end
 
   def blink(l) do
-    reduce(l, %{}, fn {e, occurences}, acc ->
-      case mutate(e) do
-        {le, ri} ->
-          acc
-          |> Map.update(le, occurences, &(&1 + occurences))
-          |> Map.update(ri, occurences, &(&1 + occurences))
-
-        v ->
-          Map.update(acc, v, occurences, &(&1 + occurences))
-      end
+    reduce(l, %{}, fn {e, freq}, acc ->
+      mutate(e) |> reduce(acc, fn v, r_acc -> Map.update(r_acc, v, freq, &(&1 + freq)) end)
     end)
   end
 
