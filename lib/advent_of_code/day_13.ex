@@ -13,19 +13,15 @@ defmodule AdventOfCode.Day13 do
      {String.to_integer(tx), String.to_integer(ty)}}
   end
 
-  def parse(args) do
-    args
-    |> String.split("\n\n", trim: true)
-    |> map(&parse_machine/1)
-  end
+  def parse(args), do: args |> String.split("\n\n", trim: true) |> map(&parse_machine/1)
 
   def is_an_integer(x) when is_integer(x), do: true
   def is_an_integer(x), do: x == round(x)
 
-  def play_machine1(p), do: play_machine(p, true)
-  def play_machine2(p), do: play_machine(p, false)
+  def play1(p), do: play(p, true)
+  def play2(p), do: play(p, false)
 
-  def play_machine({{ax, ay}, {bx, by}, {tx, ty}}, max_100) do
+  def play({{ax, ay}, {bx, by}, {tx, ty}}, max_100) do
     det = ax * by - ay * bx
 
     if det == 0 do
@@ -43,15 +39,8 @@ defmodule AdventOfCode.Day13 do
     end
   end
 
-  def part1(args) do
-    args |> parse() |> map(&play_machine1/1) |> sum()
-  end
+  def magnify(l, f), do: map(l, fn {a, b, {tx, ty}} -> {a, b, {f + tx, f + ty}} end)
 
-  def part2(args) do
-    args
-    |> parse()
-    |> map(fn {a, b, {tx, ty}} -> {a, b, {10_000_000_000_000 + tx, 10_000_000_000_000 + ty}} end)
-    |> map(&play_machine2/1)
-    |> sum()
-  end
+  def part1(args), do: args |> parse() |> map(&play1/1) |> sum()
+  def part2(args), do: args |> parse() |> magnify(10_000_000_000_000) |> map(&play2/1) |> sum()
 end
