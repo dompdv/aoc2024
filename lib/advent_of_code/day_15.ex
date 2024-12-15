@@ -1,7 +1,65 @@
 defmodule AdventOfCode.Day15 do
   import Enum
 
-  def parse_grid(grid) do
+  ## Print grid
+  def print({grid, robot}) do
+    maxr = for({{r, _}, _} <- grid, do: r) |> max()
+    maxc = for({{_, c}, _} <- grid, do: c) |> max()
+    symbols = %{nil => ".", :wall => "#", :box => "O", :lbox => "[", :rbox => "]"}
+
+    for r <- 0..maxr do
+      for c <- 0..maxc do
+        if {r, c} == robot,
+          do: "@",
+          else: symbols[Map.get(grid, {r, c})]
+      end
+      |> join()
+      |> IO.puts()
+    end
+
+    IO.puts("")
+    {grid, robot}
+  end
+
+  # Grid Score
+  def gps({grid, _}) do
+    reduce(grid, 0, fn
+      {{r, c}, :box}, acc -> acc + 100 * r + c
+      {{r, c}, :lbox}, acc -> acc + 100 * r + c
+      _, acc -> acc
+    end)
+  end
+
+  ## Parse moves
+  @dir_symbols %{?< => :left, ?^ => :up, ?> => :right, ?v => :down}
+  def parse_moves(moves) do
+    for(dir <- to_charlist(moves), do: @dir_symbols[dir]) |> reject(&is_nil/1)
+  end
+
+  # Move
+  @dirs %{up: {-1, 0}, down: {1, 0}, left: {0, -1}, right: {0, 1}}
+  def move({r, c}, dir) do
+    {dr, dc} = @dirs[dir]
+    {r + dr, c + dc}
+  end
+
+  # Run the full simulation
+  def run(args, parse, moveable?, push) do
+    {initial_state, moves} = args |> parse.()
+
+    reduce(moves, print(initial_state), fn dir, {g, pos} = state ->
+      new_pos = move(pos, dir)
+
+      if moveable?.(new_pos, dir, g),
+        do: {push.(g, new_pos, dir), new_pos},
+        else: state
+    end)
+    |> print()
+    |> gps()
+  end
+
+  ## Part 1
+  def parse_grid1(grid) do
     grid
     |> String.split("\n", trim: true)
     |> with_index()
@@ -21,107 +79,48 @@ defmodule AdventOfCode.Day15 do
     end)
   end
 
-  def parse_moves(moves) do
-    moves
-    |> to_charlist()
-    |> reduce([], fn
-      ?<, acc -> [:left | acc]
-      ?^, acc -> [:up | acc]
-      ?>, acc -> [:right | acc]
-      ?v, acc -> [:down | acc]
-      _, acc -> acc
-    end)
-    |> reverse()
-  end
-
-  def parse(args) do
+  def parse1(args) do
     [grid, moves] = args |> String.split("\n\n", trim: true)
-    {parse_grid(grid), parse_moves(moves)}
+    {parse_grid1(grid), parse_moves(moves)}
   end
 
-  def print(robot, grid) do
-    {max_r, max_c} =
-      grid
-      |> Map.keys()
-      |> Enum.reduce({0, 0}, fn {r, c}, {max_r, max_c} ->
-        {Kernel.max(r, max_r), Kernel.max(c, max_c)}
-      end)
-
-    for r <- 0..max_r do
-      for c <- 0..max_c do
-        if {r, c} == robot do
-          "@"
-        else
-          case Map.get(grid, {r, c}) do
-            nil -> "."
-            :wall -> "#"
-            :box -> "O"
-            :lbox -> "["
-            :rbox -> "]"
-          end
-        end
-      end
-      |> join()
-      |> IO.puts()
-    end
-
-    IO.puts("")
-  end
-
-  @dirs %{up: {-1, 0}, down: {1, 0}, left: {0, -1}, right: {0, 1}}
-  def move({r, c}, dir) do
-    {dr, dc} = @dirs[dir]
-    {r + dr, c + dc}
-  end
-
-  def moveable?(pos, dir, grid) do
+  # Check is a cell is moveable
+  def moveable1?(pos, dir, grid) do
+    # empty cell is moveable (so to speak: you can move the void)
+    # a wall is not moveable
+    # a box is moveable if the cell after it in the same direction is moveable
     case Map.get(grid, pos) do
       nil -> true
       :wall -> false
-      :box -> moveable?(move(pos, dir), dir, grid)
+      :box -> moveable1?(move(pos, dir), dir, grid)
     end
   end
 
-  def push(grid, pos, dir) do
+  # Push a cell in a direction
+  # ie modify the grid accordingly
+  def push1(grid, pos, dir) do
     case Map.get(grid, pos) do
       nil ->
+        # empty cell, nothing to do
         grid
 
       :wall ->
+        # wall, nothing to do, as you can't move it
         grid
 
       :box ->
         new_pos = move(pos, dir)
-
-        if moveable?(new_pos, dir, grid) do
-          grid |> push(new_pos, dir) |> Map.put(pos, nil) |> Map.put(new_pos, :box)
+        # If the box is moveable, we move it
+        if moveable1?(new_pos, dir, grid) do
+          # We push the next cell and we move the box itself
+          grid |> push1(new_pos, dir) |> Map.put(pos, nil) |> Map.put(new_pos, :box)
         else
           grid
         end
     end
   end
 
-  def gps({_, grid}) do
-    reduce(grid, 0, fn
-      {{r, c}, :box}, acc -> acc + 100 * r + c
-      _, acc -> acc
-    end)
-  end
-
-  def part1(args) do
-    {{grid, robot}, moves} = args |> parse()
-
-    reduce(moves, {robot, grid}, fn dir, {pos, g} ->
-      new_pos = move(pos, dir)
-
-      if moveable?(new_pos, dir, g) do
-        {new_pos, push(g, new_pos, dir)}
-      else
-        {pos, g}
-      end
-    end)
-    |> gps()
-  end
+  def part1(args), do: run(args, &parse1/1, &moveable1?/3, &push1/3)
 
   ### PART2
   def parse_grid2(grid) do
@@ -159,8 +158,6 @@ defmodule AdventOfCode.Day15 do
   def moveable2?({r, c} = pos, dir, grid) do
     cell = Map.get(grid, pos)
 
-    IO.inspect({pos, cell, dir}, label: "moveable2?")
-
     cond do
       cell == nil ->
         true
@@ -168,29 +165,16 @@ defmodule AdventOfCode.Day15 do
       cell == :wall ->
         false
 
-      cell == :lbox and dir == :right ->
-        moveable2?({r, c + 2}, dir, grid)
+      # Same as part 1 for the left and right directions
+      dir == :left or dir == :right ->
+        moveable2?(move(pos, dir), dir, grid)
 
-      cell == :rbox and dir == :right ->
-        moveable2?({r, c + 1}, dir, grid)
+      # For the up and down directions, we need to check if the two cells are moveable
+      cell == :lbox ->
+        moveable2?(move(pos, dir), dir, grid) and moveable2?(move({r, c + 1}, dir), dir, grid)
 
-      cell == :lbox and dir == :left ->
-        moveable2?({r, c - 1}, dir, grid)
-
-      cell == :rbox and dir == :left ->
-        moveable2?({r, c - 2}, dir, grid)
-
-      cell == :lbox and dir == :up ->
-        moveable2?({r - 1, c}, dir, grid) and moveable2?({r - 1, c + 1}, dir, grid)
-
-      cell == :rbox and dir == :up ->
-        moveable2?({r - 1, c}, dir, grid) and moveable2?({r - 1, c - 1}, dir, grid)
-
-      cell == :lbox and dir == :down ->
-        moveable2?({r + 1, c}, dir, grid) and moveable2?({r + 1, c + 1}, dir, grid)
-
-      cell == :rbox and dir == :down ->
-        moveable2?({r + 1, c}, dir, grid) and moveable2?({r + 1, c - 1}, dir, grid)
+      cell == :rbox ->
+        moveable2?(move(pos, dir), dir, grid) and moveable2?(move({r, c - 1}, dir), dir, grid)
     end
   end
 
@@ -204,24 +188,8 @@ defmodule AdventOfCode.Day15 do
       cell == :wall ->
         grid
 
-      (cell == :lbox or cell == :rbox) and (dir == :up or dir == :down) ->
-        other_cell = if cell == :lbox, do: :rbox, else: :lbox
-        shiftc = if cell == :lbox, do: 1, else: -1
-        shiftr = if dir == :up, do: -1, else: 1
-
-        if moveable2?({r + shiftr, c}, dir, grid) do
-          grid
-          |> push2({r + shiftr, c}, dir)
-          |> push2({r + shiftr, c + shiftc}, dir)
-          |> Map.put(pos, nil)
-          |> Map.put({r + shiftr, c}, cell)
-          |> Map.put({r, c + shiftc}, nil)
-          |> Map.put({r + shiftr, c + shiftc}, other_cell)
-        else
-          grid
-        end
-
-      true ->
+      # Same as part 1 for the left and right directions
+      dir == :left or dir == :right ->
         new_pos = move(pos, dir)
 
         if moveable2?(new_pos, dir, grid) do
@@ -229,87 +197,25 @@ defmodule AdventOfCode.Day15 do
         else
           grid
         end
+
+      dir == :up or dir == :down ->
+        # For the up and down directions, we need to move two cells
+        other_cell = if cell == :lbox, do: :rbox, else: :lbox
+        shiftc = if cell == :lbox, do: 1, else: -1
+
+        if moveable2?(move(pos, dir), dir, grid) do
+          grid
+          |> push2(move(pos, dir), dir)
+          |> push2(move({r, c + shiftc}, dir), dir)
+          |> Map.put(pos, nil)
+          |> Map.put(move(pos, dir), cell)
+          |> Map.put({r, c + shiftc}, nil)
+          |> Map.put(move({r, c + shiftc}, dir), other_cell)
+        else
+          grid
+        end
     end
   end
 
-  def gps2({_, grid}) do
-    reduce(grid, 0, fn
-      {{r, c}, :lbox}, acc -> acc + 100 * r + c
-      _, acc -> acc
-    end)
-  end
-
-  def part2(args) do
-    {{grid, robot}, moves} = args |> parse2()
-    print(robot, grid)
-
-    reduce(moves, {robot, grid}, fn dir, {pos, g} ->
-      new_pos = move(pos, dir)
-
-      {np, ng} =
-        if moveable2?(new_pos, dir, g) do
-          {new_pos, push2(g, new_pos, dir)}
-        else
-          {pos, g}
-        end
-
-      {np, ng}
-    end)
-    |> gps2()
-  end
-
-  def test(_) do
-    """
-    ########
-    #..O.O.#
-    ##@.O..#
-    #...O..#
-    #.#.O..#
-    #...O..#
-    #......#
-    ########
-
-    <^^>>>vv<v>>v<<
-    """
-  end
-
-  def test2(_) do
-    """
-    ##########
-    #..O..O.O#
-    #......O.#
-    #.OO..O.O#
-    #..O@..O.#
-    #O#..O...#
-    #O..O..O.#
-    #.OO.O.OO#
-    #....O...#
-    ##########
-
-    <vv>^<v^>v>^vv^v>v<>v^v<v<^vv<<<^><<><>>v<vvv<>^v^>^<<<><<v<<<v^vv^v>^
-    vvv<<^>^v^^><<>>><>^<<><^vv^^<>vvv<>><^^v>^>vv<>v<<<<v<^v>^<^^>>>^<v<v
-    ><>vv>v^v^<>><>>>><^^>vv>v<^^^>>v^v^<^^>v^^>v^<^v>v<>>v^v^<v>v^^<^^vv<
-    <<v<^>>^^^^>>>v^<>vvv^><v<<<>^^^vv^<vvv>^>v<^^^^v<>^>vvvv><>>v^<<^^^^^
-    ^><^><>>><>^^<<^^v>>><^<v>^<vv>>v>>>^v><>^v><<<<v>>v<v<v>vvv>^<><<>^><
-    ^>><>^v<><^vvv<^^<><v<<<<<><^v<<<><<<^^<v<^^^><^>>^<v^><<<^>>^v<v^v<v^
-    >^>>^v>vv>^<<^v<>><<><<v<<v><>v<^vv<<<>^^v^>^^>>><<^v>>v^v><^^>>^<>vv^
-    <><^^>^^^<><vvvvv^v<v<<>^v<v>v<<^><<><<><<<^^<<<^<<>><<><^^^>^^<>^>v<>
-    ^^>vv<^v^v<vv>^<><v<^v>^^^>>>^^vvv^>vvv<>>>^<^>>>>>^<<^v>^vvv<>^<><<v>
-    v^^>>><<^^<>>^v^<v^vv<>v^<<>^<^v^v><^<<<><<^<v><v<>vv>>v><v^<vv<>v^<<^
-    """
-  end
-
-  def test3(_) do
-    """
-    #######
-    #...#.#
-    #.....#
-    #..OO@#
-    #..O..#
-    #.....#
-    #######
-
-    <vv<<^^<<^^
-    """
-  end
+  def part2(args), do: run(args, &parse2/1, &moveable2?/3, &push2/3)
 end
