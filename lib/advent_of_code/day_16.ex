@@ -18,10 +18,10 @@ defmodule AdventOfCode.Day16 do
     end)
     |> reduce({MapSet.new(), nil, nil}, fn e, {grid, start, finish} ->
       case e do
-        {_pos, ?.} -> {grid, start, finish}
-        {pos, ?#} -> {MapSet.put(grid, pos), start, finish}
-        {pos, ?S} -> {grid, pos, finish}
-        {pos, ?E} -> {grid, start, pos}
+        {_pos, ?#} -> {grid, start, finish}
+        {pos, ?.} -> {MapSet.put(grid, pos), start, finish}
+        {pos, ?S} -> {MapSet.put(grid, pos), pos, finish}
+        {pos, ?E} -> {MapSet.put(grid, pos), start, pos}
       end
     end)
   end
@@ -34,14 +34,14 @@ defmodule AdventOfCode.Day16 do
   def cw(dir), do: @clockwise[dir]
   def ccw(dir), do: @counter_clockwise[dir]
 
-  def possible_moves({cell, facing}, seen, grid) do
+  def possible_moves({cell, facing}, queue, grid) do
     reduce(
-      [{:forward, facing}, {:cw, cw(facing)}, {:ccw, ccw(facing)}],
+      [{:forward, facing}, {:turn, cw(facing)}, {:turn, ccw(facing)}],
       [],
       fn {move_type, dir}, acc ->
         landing = move(cell, dir)
 
-        if landing in seen or landing in grid,
+        if landing not in queue or landing not in grid,
           do: acc,
           else: [{move_type, dir, landing} | acc]
       end
@@ -50,43 +50,36 @@ defmodule AdventOfCode.Day16 do
   end
 
   def solve({grid, start, finish}) do
-    solve({start, :e}, MapSet.new([start]), 0, @big_number, {grid, finish}, [])
+    distances =
+      for(cell <- grid, into: %{}, do: {cell, {@big_number, nil}}) |> Map.put(start, {0, :e})
+
+    queue = distances |> Map.keys() |> MapSet.new()
+
+    djikstra(queue, distances, grid, finish)
   end
 
-  def solve({cell, _}, _seen, current_score, _current_min, {_grid, cell}, path) do
-    IO.inspect({current_score, reverse(path)}, label: "Path")
-    # IO.inspect(current_score, label: "Path")
-    current_score
-  end
+  def djikstra(queue, distances, grid, finish) do
+    pos_min = min_by(queue, fn pos -> distances[pos] |> elem(0) end)
 
-  def solve(_, _seen, current_score, current_min, _, _path) when current_score >= current_min,
-    do: current_min
+    {dist_min, dir_min} = distances[pos_min]
 
-  def solve(pos, seen, current_score, current_min, {grid, _finish} = fgrid, path) do
-    if :rand.uniform() < 0.000001 do
-      IO.inspect({pos, current_score, length(path)}, label: "solve")
+    if pos_min == finish do
+      dist_min
+    else
+      new_queue = MapSet.delete(queue, pos_min)
+      p_moves = possible_moves({pos_min, dir_min}, new_queue, grid)
+
+      new_distance =
+        reduce(p_moves, distances, fn {move_type, dir, landing}, acc ->
+          dist = dist_min + if move_type == :forward, do: 1, else: 1001
+
+          if dist < elem(acc[landing], 0),
+            do: Map.put(acc, landing, {dist, dir}),
+            else: acc
+        end)
+
+      djikstra(new_queue, new_distance, grid, finish)
     end
-
-    possible_moves(pos, seen, grid)
-    |> reduce(
-      current_min,
-      fn {move_type, new_dir, landing}, cc_min ->
-        new_score = current_score + if move_type == :forward, do: 1, else: 1001
-
-        if new_score >= cc_min do
-          cc_min
-        else
-          new_seen = MapSet.put(seen, landing)
-
-          current_score =
-            solve({landing, new_dir}, new_seen, new_score, cc_min, fgrid, [
-              {move_type, new_dir, landing} | path
-            ])
-
-          Kernel.min(current_score, cc_min)
-        end
-      end
-    )
   end
 
   def part1(args) do
