@@ -1,13 +1,14 @@
 defmodule AdventOfCode.Day16 do
   import Enum
 
-  #  @possible_turns %{n: [:e, :w], e: [:s, :n], s: [:w, :e], w: [:n, :s]}
   @dirs %{n: {-1, 0}, e: {0, 1}, s: {1, 0}, w: {0, -1}}
   @big_number 1_000_000_000
   @clockwise %{n: :e, e: :s, s: :w, w: :n}
   @counter_clockwise %{n: :w, w: :s, s: :e, e: :n}
+
   def parse(grid) do
     grid
+    |> String.trim()
     |> String.split("\n", trim: true)
     |> with_index()
     |> flat_map(fn {row, r} ->
@@ -16,12 +17,12 @@ defmodule AdventOfCode.Day16 do
       |> with_index()
       |> map(fn {cell, c} -> {{r, c}, cell} end)
     end)
-    |> reduce({MapSet.new(), nil, nil}, fn e, {grid, start, finish} ->
+    |> reduce({MapSet.new(), nil, nil, %{}}, fn e, {grid, start, finish, gridr} ->
       case e do
-        {_pos, ?#} -> {grid, start, finish}
-        {pos, ?.} -> {MapSet.put(grid, pos), start, finish}
-        {pos, ?S} -> {MapSet.put(grid, pos), pos, finish}
-        {pos, ?E} -> {MapSet.put(grid, pos), start, pos}
+        {pos, ?#} -> {grid, start, finish, Map.put(gridr, pos, "#")}
+        {pos, ?.} -> {MapSet.put(grid, pos), start, finish, Map.put(gridr, pos, ".")}
+        {pos, ?S} -> {MapSet.put(grid, pos), pos, finish, Map.put(gridr, pos, ".")}
+        {pos, ?E} -> {MapSet.put(grid, pos), start, pos, Map.put(gridr, pos, ".")}
       end
     end)
   end
@@ -36,7 +37,7 @@ defmodule AdventOfCode.Day16 do
 
   def possible_moves({cell, facing}, queue, grid) do
     reduce(
-      [{:forward, facing}, {:turn, cw(facing)}, {:turn, ccw(facing)}],
+      [{:forward, facing}, {:cw, cw(facing)}, {:ccw, ccw(facing)}],
       [],
       fn {move_type, dir}, acc ->
         landing = move(cell, dir)
@@ -46,44 +47,77 @@ defmodule AdventOfCode.Day16 do
           else: [{move_type, dir, landing} | acc]
       end
     )
-    |> sort(fn {_, _, landing1}, {_, _, landing2} -> landing1 >= landing2 end)
   end
 
-  def solve({grid, start, finish}) do
+  def solve({grid, start, finish, _}) do
     distances =
-      for(cell <- grid, into: %{}, do: {cell, {@big_number, nil}}) |> Map.put(start, {0, :e})
+      for(cell <- grid, into: %{}, do: {cell, {@big_number, nil}})
+      |> Map.put(start, {0, :e})
 
-    queue = distances |> Map.keys() |> MapSet.new()
+    paths = for(cell <- grid, into: %{}, do: {cell, []})
 
-    djikstra(queue, distances, grid, finish)
+    dijkstra(grid, distances, paths, grid, finish)
   end
 
-  def djikstra(queue, distances, grid, finish) do
-    pos_min = min_by(queue, fn pos -> distances[pos] |> elem(0) end)
-
-    {dist_min, dir_min} = distances[pos_min]
-
-    if pos_min == finish do
-      dist_min
+  def dijkstra(queue, distances, paths, grid, finish) do
+    if MapSet.size(queue) == 0 do
+      {distances[finish] |> elem(0), reverse(paths[finish])}
     else
+      pos_min = min_by(queue, fn pos -> elem(distances[pos], 0) end)
+      {dist_min, dir_min} = distances[pos_min]
       new_queue = MapSet.delete(queue, pos_min)
+
       p_moves = possible_moves({pos_min, dir_min}, new_queue, grid)
 
-      new_distance =
-        reduce(p_moves, distances, fn {move_type, dir, landing}, acc ->
-          dist = dist_min + if move_type == :forward, do: 1, else: 1001
+      {new_distance, new_paths} =
+        reduce(
+          p_moves,
+          {distances, paths},
+          fn {move_type, dir, landing}, {l_dist, l_paths} = acc ->
+            dist = dist_min + if move_type == :forward, do: 1, else: 1001
 
-          if dist < elem(acc[landing], 0),
-            do: Map.put(acc, landing, {dist, dir}),
-            else: acc
-        end)
+            if dist < elem(l_dist[landing], 0) do
+              {Map.put(l_dist, landing, {dist, dir}),
+               Map.put(l_paths, landing, [{pos_min, move_type, dir, dist} | paths[pos_min]])}
+            else
+              acc
+            end
+          end
+        )
 
-      djikstra(new_queue, new_distance, grid, finish)
+      dijkstra(new_queue, new_distance, new_paths, grid, finish)
     end
   end
 
+  def print({grid, start, finish, gridr}, path) do
+    max_r = max_by(gridr, fn {{r, _}, _} -> r end) |> elem(0) |> elem(0)
+    max_c = max_by(gridr, fn {{_, c}, _} -> c end) |> elem(0) |> elem(1)
+    ppath = for {pos_min, _move_type, dir, _dist} <- path, into: %{}, do: {pos_min, dir}
+
+    for r <- 0..max_r do
+      for c <- 0..max_c do
+        p = ppath[{r, c}]
+
+        cond do
+          {r, c} == start -> "S"
+          {r, c} == finish -> "E"
+          p != nil -> %{n: "^", e: ">", s: "v", w: "<"}[p]
+          {r, c} in grid -> "."
+          true -> "#"
+        end
+      end
+      |> join()
+      |> IO.puts()
+    end
+
+    nil
+  end
+
   def part1(args) do
-    args |> parse() |> solve()
+    parsed = args |> parse()
+    {dist, path} = solve(parsed)
+    print(parsed, path)
+    dist
   end
 
   def part2(args) do
