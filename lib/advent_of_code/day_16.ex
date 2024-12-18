@@ -35,57 +35,69 @@ defmodule AdventOfCode.Day16 do
   def cw(dir), do: @clockwise[dir]
   def ccw(dir), do: @counter_clockwise[dir]
 
-  def possible_moves({cell, facing}, queue, grid) do
+  def possible_moves({cell, facing}, visited, grid) do
     reduce(
       [{:forward, facing}, {:cw, cw(facing)}, {:ccw, ccw(facing)}],
       [],
       fn {move_type, dir}, acc ->
-        landing = move(cell, dir)
+        {landing, _} = landing_pos = {move(cell, dir), dir}
 
-        if landing not in queue or landing not in grid,
+        if landing_pos in visited or landing not in grid,
           do: acc,
-          else: [{move_type, dir, landing} | acc]
+          else: [{move_type, {landing, dir}} | acc]
       end
     )
   end
 
   def solve({grid, start, finish, _}) do
     distances =
-      for(cell <- grid, into: %{}, do: {cell, {@big_number, nil}})
-      |> Map.put(start, {0, :e})
+      for(cell <- grid, dir <- [:n, :e, :s, :w], into: %{}, do: {{cell, dir}, @big_number})
+      |> Map.put({start, :e}, 0)
 
-    paths = for(cell <- grid, into: %{}, do: {cell, []})
+    visited = MapSet.new()
+    heap = MapSet.new([{start, :e}])
 
-    dijkstra(grid, distances, paths, grid, finish)
+    paths = for(cell <- grid, dir <- [:n, :e, :s, :w], into: %{}, do: {{cell, dir}, []})
+
+    dijkstra(heap, visited, distances, paths, grid, finish)
   end
 
-  def dijkstra(queue, distances, paths, grid, finish) do
-    if MapSet.size(queue) == 0 do
-      {distances[finish] |> elem(0), reverse(paths[finish])}
+  def dijkstra(heap, visited, distances, paths, grid, finish) do
+    if MapSet.size(heap) == 0 do
+      for dir <- [:n, :e, :s, :w], do: {distances[{finish, dir}], reverse(paths[{finish, dir}])}
     else
-      pos_min = min_by(queue, fn pos -> elem(distances[pos], 0) end)
-      {dist_min, dir_min} = distances[pos_min]
-      new_queue = MapSet.delete(queue, pos_min)
+      p_min = min_by(heap, fn pos -> distances[pos] end)
+      dist_min = distances[p_min]
+      new_visited = MapSet.put(visited, p_min)
 
-      p_moves = possible_moves({pos_min, dir_min}, new_queue, grid)
+      p_moves = possible_moves(p_min, new_visited, grid)
 
-      {new_distance, new_paths} =
+      {new_heap, new_distance, new_paths} =
         reduce(
           p_moves,
-          {distances, paths},
-          fn {move_type, dir, landing}, {l_dist, l_paths} = acc ->
+          {MapSet.delete(heap, p_min), distances, paths},
+          fn {move_type, landing_pos}, {l_heap, l_dist, l_paths} = acc ->
             dist = dist_min + if move_type == :forward, do: 1, else: 1001
 
-            if dist < elem(l_dist[landing], 0) do
-              {Map.put(l_dist, landing, {dist, dir}),
-               Map.put(l_paths, landing, [{pos_min, move_type, dir, dist} | paths[pos_min]])}
-            else
+            if dist > l_dist[landing_pos] do
               acc
+            else
+              new_l_paths =
+                if dist < l_dist[landing_pos] do
+                  Map.put(l_paths, landing_pos, [p_min | paths[p_min]])
+                else
+                  Map.put(l_paths, landing_pos, [p_min | paths[p_min]])
+                end
+
+              new_l_heap = MapSet.put(l_heap, landing_pos)
+              new_l_dist = Map.put(l_dist, landing_pos, dist)
+
+              {new_l_heap, new_l_dist, new_l_paths}
             end
           end
         )
 
-      dijkstra(new_queue, new_distance, new_paths, grid, finish)
+      dijkstra(new_heap, new_visited, new_distance, new_paths, grid, finish)
     end
   end
 
@@ -115,9 +127,10 @@ defmodule AdventOfCode.Day16 do
 
   def part1(args) do
     parsed = args |> parse()
-    {dist, path} = solve(parsed)
-    print(parsed, path)
-    dist
+    # {dist, path} =
+    solve(parsed) |> map(fn {dist, _} -> dist end) |> Enum.min()
+    #    print(parsed, path)
+    #    dist
   end
 
   def part2(args) do
