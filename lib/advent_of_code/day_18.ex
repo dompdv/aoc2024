@@ -1,7 +1,7 @@
 defmodule AdventOfCode.Day18 do
   import Enum
   @dirs [{-1, 0}, {1, 0}, {0, -1}, {0, 1}]
-  @big_number 1_000_000_000
+  @big_number 80 * 80
 
   def parse(args) do
     args
@@ -12,14 +12,16 @@ defmodule AdventOfCode.Day18 do
   end
 
   def solve(bytes, grid_size, t) do
-    distances =
-      for(x <- 0..(grid_size - 1), y <- 0..(grid_size - 1), into: %{}, do: {{x, y}, @big_number})
-      |> Map.put({0, 0}, 0)
-
-    visited = MapSet.new()
+    itval = 0..(grid_size - 1)
     heap = MapSet.new([{0, 0}])
+    visited = MapSet.new()
+
+    distances =
+      for(x <- itval, y <- itval, into: %{}, do: {{x, y}, @big_number}) |> Map.put({0, 0}, 0)
+
+    paths = for x <- itval, y <- itval, into: %{}, do: {{x, y}, []}
     blocks = MapSet.new(take(bytes, t))
-    dijkstra(heap, visited, distances, blocks, grid_size)
+    dijkstra(heap, visited, distances, paths, blocks, grid_size)
   end
 
   def possible_moves({x, y}, visited, blocks, gs) do
@@ -32,49 +34,49 @@ defmodule AdventOfCode.Day18 do
     end)
   end
 
-  def dijkstra(heap, visited, distances, blocks, grid_size) do
+  def dijkstra(heap, visited, distances, paths, blocks, grid_size) do
     if MapSet.size(heap) == 0 do
-      distances[{grid_size - 1, grid_size - 1}]
+      {distances[{grid_size - 1, grid_size - 1}], reverse(paths[{grid_size - 1, grid_size - 1}])}
     else
       p_min = min_by(heap, fn pos -> distances[pos] end)
       dist_min = distances[p_min]
       new_visited = MapSet.put(visited, p_min)
 
-      p_moves = possible_moves(p_min, new_visited, blocks, grid_size)
-
-      {new_heap, new_distance} =
+      {new_heap, new_distances, new_paths} =
         reduce(
-          p_moves,
-          {MapSet.delete(heap, p_min), distances},
-          fn landing, {l_heap, l_dist} = acc ->
+          possible_moves(p_min, new_visited, blocks, grid_size),
+          {MapSet.delete(heap, p_min), distances, paths},
+          fn landing, {l_heap, l_dist, l_paths} = acc ->
             dist = dist_min + 1
 
             if dist >= l_dist[landing] do
               acc
             else
-              {MapSet.put(l_heap, landing), Map.put(l_dist, landing, dist)}
+              {
+                MapSet.put(l_heap, landing),
+                Map.put(l_dist, landing, dist),
+                Map.put(l_paths, landing, [p_min | paths[p_min]])
+              }
             end
           end
         )
 
-      dijkstra(new_heap, new_visited, new_distance, blocks, grid_size)
+      dijkstra(new_heap, new_visited, new_distances, new_paths, blocks, grid_size)
     end
   end
 
   def part1(args) do
-    args |> parse() |> solve(71, 1024)
+    args |> parse() |> solve(71, 1024) |> elem(0)
   end
 
   def part2(args) do
-    bytes = parse(test(args))
-    min_time = solve(bytes, 7, 12)
+    bytes = args |> parse()
 
-    blocking =
-      reduce_while(1..12, nil, fn t, _acc ->
-        if solve(bytes, 7, t) <= min_time, do: {:cont, t}, else: {:halt, t}
-      end)
-
-    at(bytes, blocking)
+    reduce_while(with_index(bytes), nil, fn {b, i}, _ ->
+      s_path = solve(bytes, 71, i + 1) |> elem(0)
+      IO.inspect({i, b, s_path})
+      if s_path == @big_number, do: {:halt, b}, else: {:cont, nil}
+    end)
   end
 
   def test(_) do
