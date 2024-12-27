@@ -16,41 +16,50 @@ defmodule AdventOfCode.Day24 do
     else
       [_, x, op, y, z] = Regex.scan(~r/(.*) (.*) (.*) -> (.*)/, line) |> hd()
 
-      f =
+      f_op =
         case op do
-          "AND" ->
-            fn state ->
-              c_x = Map.get(state, x)
-              {state, x} = if is_function(c_x), do: c_x.(state), else: {state, c_x}
-              c_y = Map.get(state, y)
-              {state, y} = if is_function(c_y), do: c_y.(state), else: {state, c_y}
-              res = x && y
-              {Map.put(state, z, res), res}
-            end
+          "AND" -> fn x, y -> x && y end
+          "OR" -> fn x, y -> x || y end
+          "XOR" -> fn x, y -> x != y end
+        end
 
-          "OR" ->
-            fn state ->
-              c_x = Map.get(state, x)
-              {state, x} = if is_function(c_x), do: c_x.(state), else: {state, c_x}
-              c_y = Map.get(state, y)
-              {state, y} = if is_function(c_y), do: c_y.(state), else: {state, c_y}
-              res = x || y
-              {Map.put(state, z, res), res}
-            end
-
-          "XOR" ->
-            fn state ->
-              c_x = Map.get(state, x)
-              {state, x} = if is_function(c_x), do: c_x.(state), else: {state, c_x}
-              c_y = Map.get(state, y)
-              {state, y} = if is_function(c_y), do: c_y.(state), else: {state, c_y}
-              res = x != y
-              {Map.put(state, z, res), res}
-            end
+      f =
+        fn state ->
+          c_x = Map.get(state, x)
+          {state, x} = if is_function(c_x), do: c_x.(state), else: {state, c_x}
+          c_y = Map.get(state, y)
+          {state, y} = if is_function(c_y), do: c_y.(state), else: {state, c_y}
+          res = f_op.(x, y)
+          {Map.put(state, z, res), res}
         end
 
       Map.put(acc, z, f)
     end
+  end
+
+  def set_value(wires, key, value) do
+    Map.put(wires, key, fn state -> {Map.put(state, key, value), value} end)
+  end
+
+  def set_operation(wires, x, op, y, z) do
+    f_op =
+      case op do
+        "AND" -> fn x, y -> x && y end
+        "OR" -> fn x, y -> x || y end
+        "XOR" -> fn x, y -> x != y end
+      end
+
+    f =
+      fn state ->
+        c_x = Map.get(state, x)
+        {state, x} = if is_function(c_x), do: c_x.(state), else: {state, c_x}
+        c_y = Map.get(state, y)
+        {state, y} = if is_function(c_y), do: c_y.(state), else: {state, c_y}
+        res = f_op.(x, y)
+        {Map.put(state, z, res), res}
+      end
+
+    Map.put(wires, z, f)
   end
 
   def part1(args) do
