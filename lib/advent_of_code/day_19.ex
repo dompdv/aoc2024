@@ -47,7 +47,7 @@ defmodule AdventOfCode.Day19 do
   end
 
   # The trick is to memoize
-  # memo is a dictionary of target -> count
+  # memo is a map of %{target => count}
   def count_possible(towels, target, memo) do
     case Map.fetch(memo, target) do
       {:ok, value} ->
@@ -56,28 +56,39 @@ defmodule AdventOfCode.Day19 do
 
       :error ->
         # it's a miss
-        # Add all possible fitting towel
-        reduce(towels, {0, memo}, fn
-          {len, towel}, {count, mem} ->
-            if towel == target do
-              {count + 1, Map.put(mem, target, 1)}
-            else
-              if binary_slice(target, -len, len) == towel do
+        # Add all count for possible fitting towels
+        reduce(
+          # Loop on all towels
+          towels,
+          # {total possibilities, current memoization map}
+          {0, memo},
+          fn {len, towel}, {count, mem} ->
+            cond do
+              towel == target ->
+                # the target is the towel, we have 1 possibility. Let'sd memorize this
+                {count + 1, Map.put(mem, target, 1)}
+
+              binary_slice(target, -len, len) == towel ->
+                # the target ends with the towel
                 new_target = binary_slice(target, 0, byte_size(target) - len)
 
                 if possible?(towels, new_target) do
                   {poss, new_mem} =
                     count_possible(towels, binary_slice(target, 0, byte_size(target) - len), mem)
 
+                  # memorize the possibilities count
                   {count + poss, Map.put(new_mem, new_target, poss)}
                 else
+                  # No possiblity, so count == 0, memorize this
                   {count, Map.put(mem, new_target, 0)}
                 end
-              else
+
+              true ->
+                # continue to the next towel
                 {count, mem}
-              end
             end
-        end)
+          end
+        )
     end
   end
 
