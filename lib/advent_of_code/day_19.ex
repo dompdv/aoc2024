@@ -40,16 +40,23 @@ defmodule AdventOfCode.Day19 do
   def part1(args) do
     {towels, targets} = args |> parse()
 
-    for(target <- targets, do: possible?(towels, target))
+    for target <- targets do
+      possible?(towels, target)
+    end
     |> count(& &1)
   end
 
+  # The trick is to memoize
+  # memo is a dictionary of target -> count
   def count_possible(towels, target, memo) do
     case Map.fetch(memo, target) do
       {:ok, value} ->
+        # It's a hit
         {value, memo}
 
       :error ->
+        # it's a miss
+        # Add all possible fitting towel
         reduce(towels, {0, memo}, fn
           {len, towel}, {count, mem} ->
             if towel == target do
@@ -74,31 +81,14 @@ defmodule AdventOfCode.Day19 do
     end
   end
 
+  def count_possible(towels, target), do: count_possible(towels, target, %{}) |> elem(0)
+
   def part2(args) do
     {towels, targets} = args |> parse()
 
-    reduce(targets, 0, fn target, cpt ->
-      if possible?(towels, target) do
-        {p, _} = count_possible(towels, target, %{})
-        cpt + p
-      else
-        cpt
-      end
-    end)
-  end
-
-  def test(_) do
-    """
-    r, wr, b, g, bwu, rb, gb, br
-
-    brwrr
-    bggr
-    gbbr
-    rrbgbr
-    ubwu
-    bwurrg
-    brgr
-    bbrgwb
-    """
+    for target <- targets, possible?(towels, target) do
+      count_possible(towels, target)
+    end
+    |> sum()
   end
 end
