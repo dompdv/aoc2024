@@ -30,10 +30,13 @@ defmodule AdventOfCode.Day19 do
     end)
   end
 
+  def boolint(true), do: 1
+  def boolint(false), do: 0
+
   def part1(args) do
     {towels, targets} = args |> parse()
 
-    reduce(targets, 0, fn target, acc -> acc + if possible?(towels, target), do: 1, else: 0 end)
+    reduce(targets, 0, fn target, acc -> acc + boolint(possible?(towels, target)) end)
   end
 
   def possibilities(towels, target) do
@@ -55,57 +58,47 @@ defmodule AdventOfCode.Day19 do
     end
   end
 
+  def count_possible(towels, target, memo) do
+    case Map.fetch(memo, target) do
+      {:ok, value} ->
+        {value, memo}
+
+      :error ->
+        reduce(towels, {0, memo}, fn
+          {len, towel}, {count, mem} ->
+            if towel == target do
+              {count + 1, Map.put(mem, target, 1)}
+            else
+              if binary_slice(target, -len, len) == towel do
+                new_target = binary_slice(target, 0, byte_size(target) - len)
+
+                if possible?(towels, new_target) do
+                  {poss, new_mem} =
+                    count_possible(towels, binary_slice(target, 0, byte_size(target) - len), mem)
+
+                  {count + poss, Map.put(new_mem, new_target, poss)}
+                else
+                  {count, Map.put(mem, new_target, 0)}
+                end
+              else
+                {count, mem}
+              end
+            end
+        end)
+    end
+  end
+
   def part2(args) do
     {towels, targets} = args |> parse()
 
     reduce(targets, 0, fn target, cpt ->
       if possible?(towels, target) do
-        IO.inspect(target)
-        p = possibilities(towels, target)
-        IO.inspect({target, p})
+        {p, _} = count_possible(towels, target, %{})
         cpt + p
       else
         cpt
       end
     end)
-  end
-
-  def part2_memo(args) do
-    {towels, targets} = args |> parse()
-    memo = for {_, s} <- towels, into: %{}, do: {s, 1}
-
-    reduce(targets, {0, memo}, fn target, {cpt, l_memo} = acc ->
-      if possible?(towels, target) do
-        IO.inspect(target)
-        {inc_possib, new_memo} = possibilities_memo(towels, target, l_memo)
-        {cpt + inc_possib, new_memo}
-      else
-        acc
-      end
-    end)
-    |> elem(0)
-  end
-
-  def possibilities_memo(towels, target, memo) do
-    if Map.has_key?(memo, target) do
-      {memo[target], memo}
-    else
-      reduce(towels, {0, memo}, fn {len, towel}, {cpt, l_memo} = acc ->
-        if towel == target do
-          IO.inspect({towel}, label: "par ici")
-          {cpt + 1, Map.put(l_memo, target, 1)}
-        else
-          if binary_slice(target, -len, len) == towel do
-            {p, l_memo2} =
-              possibilities_memo(towels, binary_slice(target, 0, byte_size(target) - len), memo)
-
-            {cpt + p, Map.put(l_memo2, target, p)}
-          else
-            acc
-          end
-        end
-      end)
-    end
   end
 
   def test(_) do

@@ -65,7 +65,7 @@ defmodule AdventOfCode.Day24 do
 
   def parse2(args) do
     [input, ops] = args |> String.split("\n\n", trim: true)
-    
+    count(String.split(ops, "\n"))
   end
 
   def part2(args) do
