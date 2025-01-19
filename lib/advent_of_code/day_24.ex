@@ -2,8 +2,10 @@ defmodule AdventOfCode.Day24 do
   import Enum
 
   # Part 1
+  # extract a the number from "x08" -> 8
   def number(<<_::utf8, rest::binary>>), do: String.to_integer(rest)
 
+  # convert a list of "z00", "z01", "z02" to a single integer if it is a binary representation
   def bool_to_int(state, register) do
     reduce(register, 0, fn wire, acc ->
       acc + if state[wire], do: 2 ** number(wire), else: 0
@@ -12,35 +14,36 @@ defmodule AdventOfCode.Day24 do
 
   def parse1(args) do
     [input, ops] = String.split(args, "\n\n", trim: true)
-
-    {for line <- String.split(ops, "\n", trim: true), into: %{} do
-       [_, x, op, y, z] = Regex.scan(~r/(.*) (.*) (.*) -> (.*)/, line) |> hd()
-       {z, {x, op, y}}
-     end,
-     for line <- String.split(input, "\n", trim: true), into: %{} do
-       [reg, v] = String.split(line, ": ")
-       {reg, v == "1"}
-     end}
+    # Wires is a map of %{output register -> {input1, operation, input2}}
+    {
+      for line <- String.split(ops, "\n", trim: true), into: %{} do
+        [_, x, op, y, z] = Regex.scan(~r/(.*) (.*) (.*) -> (.*)/, line) |> hd()
+        {z, {x, op, y}}
+      end,
+      # Registers is a map of %{register -> value} (boolean value where true is 1 and false is 0)
+      for line <- String.split(input, "\n", trim: true), into: %{} do
+        [reg, v] = String.split(line, ": ")
+        {reg, v == "1"}
+      end
+    }
   end
 
+  def apply_op(state, reg, op, in1, in2), do: Map.put(state, reg, apply(state, op, in1, in2))
+  def apply(state, "AND", in1, in2), do: state[in1] && state[in2]
+  def apply(state, "OR", in1, in2), do: state[in1] || state[in2]
+  def apply(state, "XOR", in1, in2), do: state[in1] != state[in2]
+
+  # Update the state by computing the value of the register
   def value(state, register, wires) do
     case state[register] do
+      # If the register is not in the state, compute the value
       nil ->
         {in1, op, in2} = wires[register]
-
-        state = state |> value(in1, wires) |> value(in2, wires)
-
-        Map.put(
-          state,
-          register,
-          case op do
-            "AND" -> state[in1] && state[in2]
-            "OR" -> state[in1] || state[in2]
-            "XOR" -> state[in1] != state[in2]
-          end
-        )
+        # compute the value of the input registers then apply the operation
+        state |> value(in1, wires) |> value(in2, wires) |> apply_op(register, op, in1, in2)
 
       _ ->
+        # If the register is in the state, don't change the state
         state
     end
   end
@@ -50,6 +53,7 @@ defmodule AdventOfCode.Day24 do
     # identify the output register (z) bits
     z_register = for({k, _} <- wires, String.starts_with?(k, "z"), do: k) |> sort()
 
+    # compute the value of the output register (all "zxx") and convert to an integer
     reduce(z_register, registers, fn register, state -> value(state, register, wires) end)
     |> bool_to_int(z_register)
   end
