@@ -32,47 +32,43 @@ defmodule AdventOfCode.Day24 do
   end
 
   def set_operation(wires, x, op, y, z) do
-    f_op =
-      case op do
-        "AND" -> fn x, y -> x && y end
-        "OR" -> fn x, y -> x || y end
-        "XOR" -> fn x, y -> x != y end
-      end
-
     # use of closure
-    f =
-      fn state ->
-        c_x = Map.get(state, x)
+    Map.put(wires, z, fn state ->
+      c_x = Map.get(state, x)
 
-        # If there is a need to resolve the first operand, call the function, else just keep the state as it is
-        state = if is_function(c_x), do: c_x.(state), else: state
-        # same for the second operand
-        c_y = Map.get(state, y)
-        state = if is_function(c_y), do: c_y.(state), else: state
-        # Apply the function
-        res = f_op.(state[x], state[y])
-        Map.put(state, z, res)
-      end
+      # If there is a need to resolve the first operand, call the function, else just keep the state as it is
+      state = if is_function(c_x), do: c_x.(state), else: state
+      # same for the second operand
+      c_y = Map.get(state, y)
+      state = if is_function(c_y), do: c_y.(state), else: state
+      # Apply the function
+      res =
+        case op do
+          "AND" -> state[x] && state[y]
+          "OR" -> state[x] || state[y]
+          "XOR" -> state[x] != state[y]
+        end
 
-    Map.put(wires, z, f)
+      Map.put(state, z, res)
+    end)
   end
 
   def number(<<_::utf8, rest::binary>>), do: String.to_integer(rest)
 
-  def bool_to_int(wires, registers, register) do
-    reduce(registers[register], 0, fn wire, acc ->
-      acc + if wires[wire], do: 2 ** number(wire), else: 0
+  def bool_to_int(state, register) do
+    reduce(register, 0, fn wire, acc ->
+      acc + if state[wire], do: 2 ** number(wire), else: 0
     end)
   end
 
   def part1(args) do
     initial_wires = args |> parse()
-    registers = %{"z" => for({k, _} <- initial_wires, String.starts_with?(k, "z"), do: k)}
+    # identify the output register (z) bits
+    z_register = for({k, _} <- initial_wires, String.starts_with?(k, "z"), do: k)
 
-    reduce(registers["z"], initial_wires, fn wires, acc ->
-      Map.get(acc, wires).(acc)
-    end)
-    |> bool_to_int(registers, "z")
+    # propagate the state, from the z bits
+    reduce(z_register, initial_wires, fn wires, acc -> Map.get(acc, wires).(acc) end)
+    |> bool_to_int(z_register)
   end
 
   def parse2(args) do
